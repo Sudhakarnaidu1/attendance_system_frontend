@@ -4,10 +4,9 @@
 // import { CircleAlert as AlertCircle, Camera, RefreshCw } from 'lucide-react';
 // import { Button } from '@/components/ui/button';
 // import { Alert, AlertDescription } from '@/components/ui/alert';
-// import { initializeFaceAPI, detectFaceAndGetDescriptor } from '@/lib/face-api';
 
 // interface CameraCaptureProps {
-//   onCapture: (descriptor: Float32Array) => void;
+//   onCapture: (imageBase64: string) => void;
 //   isLoading?: boolean;
 //   title?: string;
 //   description?: string;
@@ -17,26 +16,25 @@
 //   onCapture,
 //   isLoading = false,
 //   title = 'Capture Your Face',
-//   description = 'Position your face in the center of the frame for optimal results',
+//   description = 'Position your face in the center of the frame',
 // }: CameraCaptureProps) {
 //   const videoRef = useRef<HTMLVideoElement>(null);
 //   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+//   // ✅ NEW: store stream reference
+//   const streamRef = useRef<MediaStream | null>(null);
+
 //   const [initialized, setInitialized] = useState(false);
 //   const [error, setError] = useState<string | null>(null);
-//   const [faceDetected, setFaceDetected] = useState(false);
 //   const [isCapturing, setIsCapturing] = useState(false);
-//   const detectionIntervalRef = useRef<NodeJS.Timeout>();
 
+//   /* =========================
+//      START CAMERA
+//   ========================= */
 //   useEffect(() => {
-//     const initializeCamera = async () => {
+//     const startCamera = async () => {
 //       try {
 //         setError(null);
-//         const initialized = await initializeFaceAPI();
-
-//         if (!initialized) {
-//           setError('Failed to load face recognition models. Please check your internet connection.');
-//           return;
-//         }
 
 //         const stream = await navigator.mediaDevices.getUserMedia({
 //           video: {
@@ -46,53 +44,83 @@
 //           },
 //         });
 
+//         // ✅ NEW: store stream globally
+//         streamRef.current = stream;
+
 //         if (videoRef.current) {
 //           videoRef.current.srcObject = stream;
-//           setInitialized(true);
 
-//           detectionIntervalRef.current = setInterval(async () => {
-//             if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-//               const detection = await detectFaceAndGetDescriptor(videoRef.current);
-//               setFaceDetected(!!detection);
-//             }
-//           }, 500);
+//           videoRef.current.onloadedmetadata = () => {
+//             setInitialized(true);
+//           };
 //         }
 //       } catch (err) {
 //         const message =
 //           err instanceof Error ? err.message : 'Failed to access camera';
-//         setError(`Camera access denied: ${message}. Please check permissions.`);
+//         setError(`Camera error: ${message}`);
 //       }
 //     };
 
-//     initializeCamera();
+//     startCamera();
 
+//     // ✅ FIX: proper cleanup
 //     return () => {
-//       if (detectionIntervalRef.current) {
-//         clearInterval(detectionIntervalRef.current);
-//       }
-//       if (videoRef.current?.srcObject) {
-//         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-//         tracks.forEach((track) => track.stop());
-//       }
+//       stopCamera();
 //     };
 //   }, []);
 
+//   /* =========================
+//      STOP CAMERA (IMPORTANT)
+//   ========================= */
+//   const stopCamera = () => {
+//     // ✅ stop all tracks
+//     if (streamRef.current) {
+//       streamRef.current.getTracks().forEach((track) => track.stop());
+//       streamRef.current = null;
+//     }
+
+//     // ✅ remove video source
+//     if (videoRef.current) {
+//       videoRef.current.srcObject = null;
+//     }
+//   };
+
+//   /* =========================
+//      CAPTURE IMAGE
+//   ========================= */
 //   const handleCapture = async () => {
-//     if (!videoRef.current || !initialized) return;
+//     if (!videoRef.current || !canvasRef.current) return;
+
+//     const video = videoRef.current;
+
+//     if (!video.videoWidth || !video.videoHeight) {
+//       setError("Camera not ready yet. Please wait.");
+//       return;
+//     }
 
 //     try {
 //       setIsCapturing(true);
-//       const detection = await detectFaceAndGetDescriptor(videoRef.current);
 
-//       if (!detection?.descriptor) {
-//         setError('No face detected. Please ensure your face is visible and try again.');
-//         setIsCapturing(false);
-//         return;
-//       }
+//       const canvas = canvasRef.current;
 
-//       onCapture(detection.descriptor);
+//       canvas.width = video.videoWidth;
+//       canvas.height = video.videoHeight;
+
+//       const ctx = canvas.getContext('2d');
+//       ctx?.drawImage(video, 0, 0);
+
+//       const base64Image = canvas.toDataURL('image/jpeg', 0.95);
+
+//       console.log("Captured image:", base64Image.slice(0, 50));
+
+//       // 🔥 send to parent
+//       onCapture(base64Image);
+
+//       // ✅ NEW: stop camera immediately after capture
+//       stopCamera();
+
 //     } catch (err) {
-//       setError(err instanceof Error ? err.message : 'Failed to capture face');
+//       setError('Failed to capture image');
 //     } finally {
 //       setIsCapturing(false);
 //     }
@@ -100,16 +128,20 @@
 
 //   const handleRetry = () => {
 //     setError(null);
-//     setFaceDetected(false);
 //   };
 
+//   /* =========================
+//      UI
+//   ========================= */
 //   return (
 //     <div className="w-full space-y-4">
+
 //       <div>
 //         <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
 //         <p className="text-sm text-slate-600 mt-1">{description}</p>
 //       </div>
 
+//       {/* Camera View */}
 //       <div className="relative bg-slate-900 rounded-lg overflow-hidden aspect-video shadow-lg border-2 border-slate-200">
 //         <video
 //           ref={videoRef}
@@ -125,26 +157,15 @@
 //               <div className="inline-block p-3 bg-blue-600 rounded-full mb-3">
 //                 <Camera className="w-6 h-6 text-white animate-pulse" />
 //               </div>
-//               <p className="text-white text-sm font-medium">Initializing camera...</p>
+//               <p className="text-white text-sm font-medium">
+//                 Initializing camera...
+//               </p>
 //             </div>
-//           </div>
-//         )}
-
-//         {initialized && faceDetected && (
-//           <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-//             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-//             Face detected
-//           </div>
-//         )}
-
-//         {initialized && !faceDetected && (
-//           <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-//             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-//             Position your face
 //           </div>
 //         )}
 //       </div>
 
+//       {/* Error */}
 //       {error && (
 //         <Alert variant="destructive">
 //           <AlertCircle className="h-4 w-4" />
@@ -152,20 +173,18 @@
 //         </Alert>
 //       )}
 
+//       {/* Buttons */}
 //       <div className="flex gap-3">
 //         <Button
 //           onClick={handleCapture}
-//           disabled={!initialized || !faceDetected || isCapturing || isLoading}
+//           disabled={!initialized || isCapturing || isLoading}
 //           className="flex-1 bg-blue-600 hover:bg-blue-700"
 //         >
 //           {isCapturing ? 'Capturing...' : 'Capture Face'}
 //         </Button>
+
 //         {error && (
-//           <Button
-//             onClick={handleRetry}
-//             variant="outline"
-//             className="px-6"
-//           >
+//           <Button onClick={handleRetry} variant="outline" className="px-6">
 //             <RefreshCw className="w-4 h-4" />
 //           </Button>
 //         )}
@@ -174,13 +193,11 @@
 //   );
 // }
 
-
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CircleAlert as AlertCircle, Camera, RefreshCw } from 'lucide-react';
+import { Camera, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CameraCaptureProps {
   onCapture: (imageBase64: string) => void;
@@ -197,137 +214,159 @@ export function CameraCapture({
 }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  /* =========================
-     START CAMERA
-  ========================= */
+  const startCamera = async () => {
+    try {
+      setError(null);
+      setInitialized(false);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user',
+        },
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => setInitialized(true);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to access camera';
+      setError(`Camera error: ${message}`);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setInitialized(false);
+  };
+
   useEffect(() => {
-    const startCamera = async () => {
-      try {
-        setError(null);
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'user',
-          },
-        });
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setInitialized(true);
-        }
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to access camera';
-        setError(`Camera error: ${message}`);
-      }
-    };
-
     startCamera();
-
-    return () => {
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
-    };
+    return () => stopCamera();
   }, []);
 
-  /* =========================
-     CAPTURE IMAGE
-  ========================= */
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setError('Camera not ready yet. Please wait.');
+      return;
+    }
 
     try {
       setIsCapturing(true);
 
       const canvas = canvasRef.current;
-      const video = videoRef.current;
-
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(video, 0, 0);
 
-      const base64Image = canvas.toDataURL('image/jpeg');
+      const base64Image = canvas.toDataURL('image/jpeg', 0.95);
 
-      // 🔥 Send to parent (login/register)
+      // stop camera after capture
+      stopCamera();
+
       onCapture(base64Image);
 
     } catch (err) {
-      setError('Failed to capture image');
+      setError('Failed to capture image. Please retry.');
     } finally {
       setIsCapturing(false);
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-  };
+  // ✅ properly restarts camera on retry
+  const handleRetry = () => startCamera();
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <div className="w-full space-y-4">
-
       <div>
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-600 mt-1">{description}</p>
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <p className="text-sm text-slate-400 mt-1">{description}</p>
       </div>
 
-      {/* Camera View */}
-      <div className="relative bg-slate-900 rounded-lg overflow-hidden aspect-video shadow-lg border-2 border-slate-200">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-        />
+      <div className="relative bg-black rounded-xl overflow-hidden aspect-video border border-white/10">
+        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
 
-        {!initialized && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="text-center">
-              <div className="inline-block p-3 bg-blue-600 rounded-full mb-3">
-                <Camera className="w-6 h-6 text-white animate-pulse" />
+        {/* initializing overlay */}
+        {!initialized && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto">
+                <Camera className="w-6 h-6 text-cyan-400 animate-pulse" />
               </div>
-              <p className="text-white text-sm font-medium">
-                Initializing camera...
-              </p>
+              <p className="text-white text-sm">Initializing camera...</p>
+            </div>
+          </div>
+        )}
+
+        {/* face guide */}
+        {initialized && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-56 border-2 border-cyan-400/60 rounded-full" />
+          </div>
+        )}
+
+        {/* processing overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto" />
+              <p className="text-white text-sm">Processing...</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Error */}
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+          {error}
+        </div>
       )}
 
-      {/* Buttons */}
       <div className="flex gap-3">
         <Button
           onClick={handleCapture}
           disabled={!initialized || isCapturing || isLoading}
-          className="flex-1 bg-blue-600 hover:bg-blue-700"
+          className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white font-semibold rounded-xl"
         >
-          {isCapturing ? 'Capturing...' : 'Capture Face'}
+          {isCapturing || isLoading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {isCapturing ? 'Capturing...' : 'Processing...'}
+            </span>
+          ) : (
+            'Capture Face'
+          )}
         </Button>
 
         {error && (
-          <Button onClick={handleRetry} variant="outline" className="px-6">
+          <Button
+            onClick={handleRetry}
+            variant="outline"
+            className="px-4 border-white/20 text-slate-300 hover:bg-white/10 rounded-xl"
+          >
             <RefreshCw className="w-4 h-4" />
           </Button>
         )}

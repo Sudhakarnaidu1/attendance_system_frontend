@@ -639,7 +639,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { toast } from '../../hooks/use-toast';
+import { Header } from '@/components/layouts/header';
 
 type UserType = {
   id: string;
@@ -668,132 +669,90 @@ export default function DashboardPage() {
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
+  const [allAttendanceLogs, setAllAttendanceLogs] = useState<AttendanceLog[]>([]);
 
   /* ── Load Data ── */
   useEffect(() => {
-    // const loadData = async () => {
-    //   try {
-    //     setIsLoading(true);
-    //     const employeeId = sessionStorage.getItem('currentEmployeeId');
-
-    //     if (!employeeId) {
-    //       router.push('/login');
-    //       return;
-    //     }
-
-    //     const userRes = await fetch(`http://localhost:8000/api/users/${employeeId}`);
-    //     const userData = await userRes.json();
-
-    //     if (!userData) {
-    //       toast.error('User not found');
-    //       router.push('/login');
-    //       return;
-    //     }
-
-    //     setCurrentUser(userData);
-    //     setSelectedUserId(userData.id);
-
-    //     if (userData.user_type === 'admin') {
-    //       const usersRes = await fetch('http://localhost:8000/api/users/');
-    //       const usersData = await usersRes.json();
-    //       setAllUsers(usersData || []);
-    //     }
-
-    //     await loadAttendanceLogs(userData.id);
-    //   } catch (err) {
-    //     toast.error('Failed to load dashboard');
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // };
-
     const loadData = async () => {
-  try {
-    setIsLoading(true);
-    // const employeeId = sessionStorage.getItem('currentEmployeeId') || 'EMP001';
+      try {
+        setIsLoading(true);
+        const employeeId = sessionStorage.getItem('currentEmployeeId');
 
-    // // Mock user — remove when Django is ready
-    // const mockUser: UserType = {
-    //   id: '1',
-    //   name: 'John Doe',
-    //   employee_id: employeeId,
-    //   email: 'john@example.com',
-    //   department: 'Engineering',
-    //   user_type: 'admin', // change to 'user' to test employee view
-    // };
+        if (!employeeId) {
+          router.push('/login');
+          return;
+        }
 
-    const employeeId = sessionStorage.getItem('currentEmployeeId') || 'EMP002'; // change to EMP002
+        const userRes = await fetch(`http://127.0.0.1:8000/api/users/${employeeId}/`);
+        const userData = await userRes.json();
 
-    const mockUser: UserType = {
-      id: '2',
-      name: 'Jane Smith',
-      employee_id: employeeId,
-      email: 'jane@example.com',
-      department: 'HR',
-      user_type: 'user', // ← change this to 'user'
+        if (!userData) {
+          toast({
+            title: 'Error',
+            description: 'User not found',
+            variant: 'destructive'
+          });
+          router.push('/login');
+          return;
+        }
+
+        setCurrentUser(userData);
+        setSelectedUserId(userData.employee_id);
+
+        if (userData.user_type === 'admin') {
+          const usersRes = await fetch('http://localhost:8000/api/users/');
+          const usersData = await usersRes.json();
+          setAllUsers(usersData || []);
+
+          // ✅ NEW: fetch all logs
+          const logsRes = await fetch('http://localhost:8000/api/attendance/');
+          const logsData = await logsRes.json();
+          setAllAttendanceLogs(logsData || []);
+        }
+
+        
+
+        await loadAttendanceLogs(userData.employee_id);
+      } catch (err) {
+        toast({title: 'Error',
+          description:'Failed to load dashboard',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    setAttendanceLogs([
-    {
-      id: '1',
-      user_id: '2',
-      login_time: new Date('2025-04-01T09:00:00').toISOString(),
-      logout_time: new Date('2025-04-01T17:30:00').toISOString(),
-      status: 'present',
-    },
-    {
-      id: '2',
-      user_id: '2',
-      login_time: new Date('2025-03-31T08:45:00').toISOString(),
-      logout_time: new Date('2025-03-31T17:00:00').toISOString(),
-      status: 'present',
-    },
-  ]);
-
-    setCurrentUser(mockUser);
-    setSelectedUserId(mockUser.id);
-
-    // Mock all users (admin only)
-    setAllUsers([
-      mockUser,
-      { id: '2', name: 'Jane Smith', employee_id: 'EMP002', email: 'jane@example.com', department: 'HR', user_type: 'user' },
-    ]);
-
-    // Mock attendance logs
-    setAttendanceLogs([
-      { id: '1', user_id: '1', login_time: new Date().toISOString(), logout_time: new Date().toISOString(), status: 'present' },
-    ]);
-
-  } catch (err) {
-    toast.error('Failed to load dashboard');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-    loadData();
+    loadData()
   }, [router]);
 
   const loadAttendanceLogs = async (userId: string) => {
-    // try {
-    //   const res = await fetch(`http://localhost:8000/api/attendance/${userId}`);
-    //   const data = await res.json();
-    //   setAttendanceLogs(data || []);
-    // } catch (err) {
-    //   console.error('Failed to load attendance logs:', err);
-    // }
+    try {
+      const res = await fetch(`http://localhost:8000/api/attendance/${userId}/`);
+      const data = await res.json();
+      setAttendanceLogs(data || []);
+    } catch (err) {
+      console.error('Failed to load attendance logs:', err);
+    }
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem('currentEmployeeId');
     sessionStorage.removeItem('userType');
     router.push('/login');
-    toast.success('Logged out successfully');
+    toast({
+      title: "Success",
+      description: "Logged out successfully",
+    });
   };
 
-  const handleUserChange = async (user: UserType) => {
-    setSelectedUserId(user.id);
-    await loadAttendanceLogs(user.id);
+  // const handleUserChange = async (user: UserType) => {
+  //   setSelectedUserId(user.id);
+  //   await loadAttendanceLogs(user.employee_id);
+  // };
+  const handleUserChange = (user: UserType) => {
+    setSelectedUserId(user.employee_id); // ✅ FIX
+    loadAttendanceLogs(user.employee_id); // no await (faster UI)
   };
 
   /* ── Helpers ── */
@@ -827,7 +786,37 @@ export default function DashboardPage() {
       u.department?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const selectedUserInfo = allUsers.find((u) => u.id === selectedUserId);
+  const selectedUserInfo = allUsers.find(
+    (u) => u.employee_id === selectedUserId
+  );
+  const getTotalStudents = () => {
+  return allUsers.length;
+};
+
+const getLoggedInUsers = () => {
+  const today = new Date().toDateString();
+
+  const latestStatus = new Map<string, AttendanceLog>();
+
+  allAttendanceLogs.forEach((log) => {
+    const logDate = new Date(log.login_time).toDateString();
+
+    if (logDate === today) {
+      const existing = latestStatus.get(log.user_id);
+
+      if (
+        !existing ||
+        new Date(log.login_time) > new Date(existing.login_time)
+      ) {
+        latestStatus.set(log.user_id, log);
+      }
+    }
+  });
+
+  return Array.from(latestStatus.values()).filter(
+    (log) => log.status === 'logged_in'
+  ).length;
+};
 
   /* ── Loading ── */
   if (isLoading) {
@@ -844,6 +833,10 @@ export default function DashboardPage() {
   if (!currentUser) return null;
 
   const isAdmin = currentUser.user_type === 'admin';
+  const displayUser =
+  isAdmin && activeTab === 'all' && selectedUserInfo
+    ? selectedUserInfo
+    : currentUser;
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-white font-sans">
@@ -854,7 +847,7 @@ export default function DashboardPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Camera className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight">FaceAttend</span>
+            <span className="text-lg font-bold tracking-tight">MarkYourAttendance</span>
           </Link>
 
           <div className="flex items-center gap-4">
@@ -868,7 +861,7 @@ export default function DashboardPage() {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold">{currentUser.name}</p>
                 <p className="text-xs text-slate-500 capitalize">
-                  {isAdmin ? '🛡 Admin' : '👤 Employee'} · {currentUser.employee_id}
+                  {isAdmin ? '🛡 Admin' : '👤 Student'} · {currentUser.employee_id}
                 </p>
               </div>
               <button
@@ -881,13 +874,15 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+      {/* <Header /> */}
+
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* ─── Stats Row ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: User, label: 'Name', value: currentUser.name.split(' ')[0], color: 'cyan' },
-            { icon: Calendar, label: 'Employee ID', value: currentUser.employee_id, color: 'blue' },
+            { icon: User, label: 'Name', value: displayUser.name.split(' ')[0], color: 'cyan' },
+            { icon: Calendar, label: 'Student ID', value: displayUser.employee_id, color: 'blue' },
             { icon: Clock, label: "Today's Hours", value: getTotalWorkingHours(), color: 'violet' },
             {
               icon: CheckCircle,
@@ -926,7 +921,7 @@ export default function DashboardPage() {
           <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
             {[
               { key: 'my', label: 'My Attendance' },
-              { key: 'all', label: `All Employees (${allUsers.length})` },
+              { key: 'all', label: `All Students (${allUsers.length})` },
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -951,7 +946,7 @@ export default function DashboardPage() {
               <div className="p-4 border-b border-white/10">
                 <h2 className="font-bold text-sm mb-3 flex items-center gap-2">
                   <Users className="w-4 h-4 text-cyan-400" />
-                  All Employees
+                  All Students
                 </h2>
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -969,7 +964,7 @@ export default function DashboardPage() {
                     key={user.id}
                     onClick={() => handleUserChange(user)}
                     className={`w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-all text-left ${
-                      selectedUserId === user.id ? 'bg-cyan-500/10 border-l-2 border-cyan-500' : ''
+                      selectedUserId === user.employee_id ? 'bg-cyan-500/10 border-l-2 border-cyan-500' : ''
                     }`}
                   >
                     <div>

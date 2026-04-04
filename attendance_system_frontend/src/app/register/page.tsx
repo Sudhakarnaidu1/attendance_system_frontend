@@ -267,7 +267,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Camera, CheckCircle, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import { CameraCapture } from '../../components/face/camera-capture';
-import { toast } from 'sonner';
+import { toast } from '../../hooks/use-toast';
+import { Header } from '@/components/layouts/header';
 
 type RegistrationStep = 'details' | 'face' | 'success';
 
@@ -292,10 +293,13 @@ export default function RegisterPage() {
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) { toast.error('Name is required'); return false; }
-    if (!formData.employeeId.trim()) { toast.error('Employee ID is required'); return false; }
-    if (!formData.email.trim() || !formData.email.includes('@')) { toast.error('Valid email is required'); return false; }
-    if (!formData.password || formData.password.length < 6) { toast.error('Password must be at least 6 characters'); return false; }
+    if (!formData.name.trim()) { toast({
+      title:'Error',
+      variant: 'destructive',
+      description: 'Name is required'}); return false; }
+    if (!formData.employeeId.trim()) { toast({description:'Employee ID is required', title:'Error', variant: 'destructive'}); return false; }
+    if (!formData.email.trim() || !formData.email.includes('@')) { toast({description:'Valid email is required', title:'Error', variant:'destructive'}); return false; }
+    if (!formData.password || formData.password.length < 6) { toast({description: 'Password must be at least 6 characters', variant:'destructive', title: 'Error'}); return false; }
     return true;
   };
 
@@ -308,7 +312,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/register-face/', {
+      const res = await fetch('http://127.0.0.1:8000/api/register-face/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -323,18 +327,20 @@ export default function RegisterPage() {
       });
 
       const data = await res.json();
+      console.log("API response:", data);
+      toast({description: 'Received response from server', title: 'Success'});
 
       if (!data.success) {
-        toast.error(data.message || 'Failed to register');
+        toast({description: data.message || 'Failed to register', title:'Error', variant: 'destructive'});
         setIsLoading(false);
         return;
       }
 
       setRegisteredUser(data.user);
       setStep('success');
-      toast.success('Registration successful!');
+      toast({description: 'Registration successful!', title:'Success'});
     } catch (err) {
-      toast.error('Failed to save data');
+      toast({description:'Failed to save data', title:'Error', variant:'destructive'});
     } finally {
       setIsLoading(false);
     }
@@ -349,7 +355,7 @@ export default function RegisterPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Camera className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight">FaceAttend</span>
+            <span className="text-lg font-bold tracking-tight">MarkYourAttendance</span>
           </Link>
           <Link
             href="/login"
@@ -360,6 +366,7 @@ export default function RegisterPage() {
           </Link>
         </div>
       </header>
+      {/* <Header /> */}
 
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl">
@@ -415,7 +422,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Employee ID *
+                      Student ID *
                     </label>
                     <input
                       name="employeeId"
@@ -478,7 +485,7 @@ export default function RegisterPage() {
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0a0f1e] border border-white/15 text-white focus:outline-none focus:border-cyan-500 transition-all text-sm"
                     >
-                      <option value="user">Employee</option>
+                      <option value="user">Student</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
@@ -556,7 +563,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="border-t border-white/10" />
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Employee ID</span>
+                    <span className="text-slate-400">Student ID</span>
                     <span className="font-semibold">{registeredUser.employee_id}</span>
                   </div>
                 </div>

@@ -1,258 +1,10 @@
-// 'use client';
-
-// import { useState } from 'react';
-// import { useRouter } from 'next/navigation';
-// import { CircleAlert as AlertCircle, Lock, Search } from 'lucide-react';
-// import Link from 'next/link';
-// import { Button } from '../../components/ui/button';
-// import { Card } from '../../components/ui/card';
-// import { Input } from '../../components/ui/input';
-// import { Label } from '../../components/ui/label';
-// import { Alert, AlertDescription } from '../../components/ui/alert';
-// import { FaceDetector } from '../../components/face/face-detector';
-// import { Header } from '../../components/layouts/header';
-// import { toast } from 'sonner';
-
-// type LoginStep = 'search' | 'verify' | 'success';
-
-// type User = {
-//   id: string;
-//   name: string;
-//   employee_id: string;
-// };
-
-// export default function LoginPage() {
-//   const router = useRouter();
-
-//   const [step, setStep] = useState<LoginStep>('search');
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [employeeId, setEmployeeId] = useState('');
-//   const [foundUser, setFoundUser] = useState<User | null>(null);
-//   const [loginTime] = useState(new Date());
-
-//   /* =========================
-//      STEP 1: FIND USER (DJANGO)
-//   ========================= */
-//   const handleSearchUser = async (e: React.FormEvent) => {
-//     e.preventDefault();
-
-//     if (!employeeId.trim()) {
-//       toast.error('Please enter Employee ID');
-//       return;
-//     }
-
-//     setIsLoading(true);
-
-//     try {
-//       const res = await fetch(`http://localhost:8000/api/users/${employeeId}`);
-//       const data = await res.json();
-
-//       if (!data || !data.id) {
-//         toast.error('Employee ID not found. Please register first.');
-//         setIsLoading(false);
-//         return;
-//       }
-
-//       setFoundUser(data);
-//       sessionStorage.setItem('currentEmployeeId', data.employee_id);
-//       setStep('verify');
-
-//     } catch (err) {
-//       toast.error('Error searching for user');
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   /* =========================
-//      STEP 2: FACE VERIFY (DJANGO)
-//   ========================= */
-//   const handleFaceCapture = async (imageBase64: string) => {
-//     if (!foundUser) return;
-
-//     setIsLoading(true);
-
-//     try {
-//       const res = await fetch('http://localhost:8000/api/face-login/', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({
-//           employee_id: foundUser.employee_id,
-//           image: imageBase64,
-//         }),
-//       });
-
-//       const data = await res.json();
-
-//       if (!data.success) {
-//         toast.error('Face verification failed. Please try again.');
-//         setIsLoading(false);
-//         return;
-//       }
-
-//       setStep('success');
-//       toast.success(`Welcome ${foundUser.name}! Login successful.`);
-
-//       setTimeout(() => {
-//         router.push('/dashboard');
-//       }, 2000);
-
-//     } catch (err) {
-//       toast.error('Failed to process login');
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   const handleReset = () => {
-//     setStep('search');
-//     setEmployeeId('');
-//     setFoundUser(null);
-//   };
-
-//   return (
-//     <>
-//       <Header />
-//       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
-//         <div className="max-w-2xl mx-auto">
-
-//           {step === 'search' && (
-//             <Card className="shadow-lg border-slate-200">
-//               <div className="p-8">
-//                 <div className="mb-8">
-//                   <h1 className="text-3xl font-bold text-slate-900">Face Login</h1>
-//                   <p className="text-slate-600 mt-2">Sign in using your face recognition</p>
-//                 </div>
-
-//                 <form onSubmit={handleSearchUser} className="space-y-6">
-//                   <div>
-//                     <Label className="text-sm font-semibold text-slate-700">
-//                       Employee ID *
-//                     </Label>
-//                     <Input
-//                       value={employeeId}
-//                       onChange={(e) => setEmployeeId(e.target.value)}
-//                       placeholder="Enter your Employee ID"
-//                       className="mt-2 border-slate-300 text-base"
-//                       disabled={isLoading}
-//                     />
-//                     <p className="text-xs text-slate-500 mt-2">
-//                       Enter your Employee ID to proceed with face verification
-//                     </p>
-//                   </div>
-
-//                   <Alert>
-//                     <AlertCircle className="h-4 w-4" />
-//                     <AlertDescription className="text-sm text-slate-700">
-//                       Make sure your face is clearly visible and well-lit during verification
-//                     </AlertDescription>
-//                   </Alert>
-
-//                   <Button
-//                     type="submit"
-//                     disabled={isLoading || !employeeId.trim()}
-//                     className="w-full bg-blue-600 hover:bg-blue-700"
-//                   >
-//                     <Search className="w-4 h-4 mr-2" />
-//                     {isLoading ? 'Searching...' : 'Next: Face Verification'}
-//                   </Button>
-//                 </form>
-
-//                 <div className="mt-6 pt-6 border-t border-slate-200 text-center">
-//                   <p className="text-slate-600 text-sm">
-//                     Don't have an account?{' '}
-//                     <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-//                       Register here
-//                     </Link>
-//                   </p>
-//                 </div>
-//               </div>
-//             </Card>
-//           )}
-
-//           {step === 'verify' && foundUser && (
-//             <Card className="shadow-lg border-slate-200">
-//               <div className="p-8">
-//                 <div className="mb-8">
-//                   <div className="flex items-center gap-3 mb-4">
-//                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-//                       <Lock className="w-6 h-6 text-blue-600" />
-//                     </div>
-//                     <div>
-//                       <h1 className="text-2xl font-bold text-slate-900">Verify Your Face</h1>
-//                       <p className="text-slate-600 text-sm">Welcome back, {foundUser.name}</p>
-//                     </div>
-//                   </div>
-//                 </div>
-
-//                 <FaceDetector
-//                   onCapture={handleFaceCapture}   // 🔥 ONLY CHANGE HERE
-//                   isLoading={isLoading}
-//                 />
-
-//                 <Button
-//                   onClick={handleReset}
-//                   variant="outline"
-//                   disabled={isLoading}
-//                   className="w-full mt-6 border-slate-300"
-//                 >
-//                   Try Different User
-//                 </Button>
-//               </div>
-//             </Card>
-//           )}
-
-//           {step === 'success' && foundUser && (
-//             <Card className="shadow-lg border-green-200 bg-green-50">
-//               <div className="p-8">
-//                 <div className="text-center space-y-6">
-
-//                   <div>
-//                     <h1 className="text-3xl font-bold text-green-900">Login Successful!</h1>
-//                     <p className="text-green-700 mt-2">Your attendance has been recorded</p>
-//                   </div>
-
-//                   <div className="bg-white rounded-lg p-6 text-left space-y-3 border border-green-200">
-//                     <div className="flex justify-between">
-//                       <span>Name:</span>
-//                       <span>{foundUser.name}</span>
-//                     </div>
-//                     <div className="flex justify-between">
-//                       <span>Employee ID:</span>
-//                       <span>{foundUser.employee_id}</span>
-//                     </div>
-//                     <div className="flex justify-between">
-//                       <span>Login Time:</span>
-//                       <span>{loginTime.toLocaleTimeString()}</span>
-//                     </div>
-//                   </div>
-
-//                   <Button
-//                     onClick={() => router.push('/dashboard')}
-//                     className="w-full bg-blue-600 hover:bg-blue-700"
-//                   >
-//                     Go to Dashboard
-//                   </Button>
-
-//                 </div>
-//               </div>
-//             </Card>
-//           )}
-
-//         </div>
-//       </main>
-//     </>
-//   );
-// }
-
-
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Camera, ArrowRight, UserPlus } from 'lucide-react';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { toast } from '../../hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -272,45 +24,66 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // toast({
+    //   title: "Success",
+    //   description: "Simulating login... (Replace with actual API call)",
+    // });
 
-    // if (!formData.email.trim() || !formData.password.trim()) {
-    //   toast.error('Please fill in all fields');
-    //   return;
-    // }
+    if (!formData.email.trim() || !formData.password.trim()) {
+      toast({
+        title: "Error",
+        description: 'Please fill all the fields',
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // setIsLoading(true);
+    setIsLoading(true);
 
-    // try {
-    //   const res = await fetch('http://localhost:8000/api/login/', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({
-    //       email: formData.email,
-    //       password: formData.password,
-    //     }),
-    //   });
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/login/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    //   const data = await res.json();
+      const data = await res.json();
+      console.log('data: ', data)
 
-    //   if (!data.success) {
-    //     toast.error(data.message || 'Invalid credentials');
-    //     setIsLoading(false);
-    //     return;
-    //   }
+      if (!data.success) {
+        toast({
+          description: data.message || 'Invalid credentials',
+          title: 'Success',
+          variant: 'destructive'
+        }
+        );
+        setIsLoading(false);
+        return;
+      }
 
-    //   // Store session info
-      // sessionStorage.setItem('currentEmployeeId', data.user.employee_id);
-      // sessionStorage.setItem('userType', data.user.user_type);
-      sessionStorage.setItem('currentEmployeeId', 'EMP12345');
-      sessionStorage.setItem('userType', 'user');
+      // Store session info
+      sessionStorage.setItem('currentEmployeeId', data.user.employee_id);
+      sessionStorage.setItem('userType', data.user.user_type);
 
-    //   toast.success(`Welcome back, ${data.user.name}!`);
+      toast({
+        title: "Success",
+        description: 'Logged in successfully.',
+        // variant: "destructive",
+      });
       router.push('/dashboard');
-    // } catch (err) {
-    //   toast.error('Login failed. Please try again.');
-    // } finally {
-    //   setIsLoading(false);
-    // }
+    } catch (err) {
+      // toast.error('Login failed. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to login. Please try again",
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -322,7 +95,7 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Camera className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight">FaceAttend</span>
+            <span className="text-lg font-bold tracking-tight">MarkYourAttendance</span>
           </Link>
           <Link
             href="/register"
@@ -340,7 +113,7 @@ export default function LoginPage() {
           {/* Title */}
           <div className="mb-8 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold tracking-wider uppercase mb-4">
-              Employee Portal
+              Login Portal
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">Sign In</h1>
             <p className="text-slate-400 mt-2 text-sm">Access your attendance records and dashboard</p>

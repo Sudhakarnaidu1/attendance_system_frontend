@@ -1,184 +1,128 @@
 // 'use client';
 
 // import { useEffect, useRef, useState } from 'react';
-// import { CircleAlert as AlertCircle, ChartBar as BarChart3, Loader as Loader2 } from 'lucide-react';
-// import { Alert, AlertDescription } from '@/components/ui/alert';
+// import { Loader2 } from 'lucide-react';
 // import { Button } from '@/components/ui/button';
-// import { Progress } from '../../components/ui/progress';
-// import { initializeFaceAPI, detectFaceAndGetDescriptor, compareFaces, arrayToDescriptor } from '@/lib/face-api';
 
 // interface FaceDetectorProps {
-//   onSuccess: (matched: boolean, confidence: number) => void;
-//   storedFaceData: number[];
+//   onCapture: (imageBase64: string) => void;
 //   isLoading?: boolean;
 // }
 
-// export function FaceDetector({
-//   onSuccess,
-//   storedFaceData,
-//   isLoading = false,
-// }: FaceDetectorProps) {
+// export function FaceDetector({ onCapture, isLoading }: FaceDetectorProps) {
 //   const videoRef = useRef<HTMLVideoElement>(null);
 //   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+//   // ✅ NEW: store stream safely
+//   const streamRef = useRef<MediaStream | null>(null);
+
 //   const [initialized, setInitialized] = useState(false);
-//   const [error, setError] = useState<string | null>(null);
-//   const [faceDetected, setFaceDetected] = useState(false);
-//   const [isProcessing, setIsProcessing] = useState(false);
-//   const [confidence, setConfidence] = useState(0);
-//   const detectionIntervalRef = useRef<NodeJS.Timeout>();
 
+//   /* =========================
+//      START CAMERA
+//   ========================= */
 //   useEffect(() => {
-//     const initializeCamera = async () => {
+//     const startCamera = async () => {
 //       try {
-//         setError(null);
-//         const initialized = await initializeFaceAPI();
-
-//         if (!initialized) {
-//           setError('Failed to load face recognition models. Please check your internet connection.');
-//           return;
-//         }
-
 //         const stream = await navigator.mediaDevices.getUserMedia({
-//           video: {
-//             width: { ideal: 640 },
-//             height: { ideal: 480 },
-//             facingMode: 'user',
-//           },
+//           video: true,
 //         });
+
+//         // ✅ store stream
+//         streamRef.current = stream;
 
 //         if (videoRef.current) {
 //           videoRef.current.srcObject = stream;
-//           setInitialized(true);
 
-//           detectionIntervalRef.current = setInterval(async () => {
-//             if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-//               const detection = await detectFaceAndGetDescriptor(videoRef.current);
-
-//               if (detection?.descriptor) {
-//                 setFaceDetected(true);
-
-//                 try {
-//                   const storedDescriptor = arrayToDescriptor(storedFaceData);
-//                   const result = await compareFaces(detection.descriptor, storedDescriptor);
-//                   setConfidence(result.confidence);
-
-//                   if (result.isMatch) {
-//                     setIsProcessing(true);
-//                     setTimeout(() => {
-//                       onSuccess(true, result.confidence);
-//                       setIsProcessing(false);
-//                     }, 800);
-//                   }
-//                 } catch (err) {
-//                   console.error('Face comparison error:', err);
-//                 }
-//               } else {
-//                 setFaceDetected(false);
-//                 setConfidence(0);
-//               }
-//             }
-//           }, 500);
+//           videoRef.current.onloadedmetadata = () => {
+//             setInitialized(true);
+//           };
 //         }
 //       } catch (err) {
-//         const message = err instanceof Error ? err.message : 'Failed to access camera';
-//         setError(`Camera access denied: ${message}. Please check permissions.`);
+//         console.error('Camera error:', err);
 //       }
 //     };
 
-//     initializeCamera();
+//     startCamera();
 
+//     // ✅ IMPORTANT CLEANUP
 //     return () => {
-//       if (detectionIntervalRef.current) {
-//         clearInterval(detectionIntervalRef.current);
-//       }
-//       if (videoRef.current?.srcObject) {
-//         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-//         tracks.forEach((track) => track.stop());
-//       }
+//       stopCamera();
 //     };
-//   }, [storedFaceData, onSuccess]);
+//   }, []);
+
+//   /* =========================
+//      STOP CAMERA (CRITICAL)
+//   ========================= */
+//   const stopCamera = () => {
+//     if (streamRef.current) {
+//       streamRef.current.getTracks().forEach((track) => track.stop());
+//       streamRef.current = null;
+//     }
+
+//     if (videoRef.current) {
+//       videoRef.current.srcObject = null;
+//     }
+//   };
+
+//   /* =========================
+//      CAPTURE IMAGE
+//   ========================= */
+//   const captureImage = () => {
+//     if (!videoRef.current || !canvasRef.current) return;
+
+//     const canvas = canvasRef.current;
+//     const video = videoRef.current;
+
+//     canvas.width = video.videoWidth;
+//     canvas.height = video.videoHeight;
+
+//     const ctx = canvas.getContext('2d');
+//     ctx?.drawImage(video, 0, 0);
+
+//     const base64 = canvas.toDataURL('image/jpeg');
+
+//     onCapture(base64);
+
+//     // ✅ STOP CAMERA AFTER CAPTURE
+//     stopCamera();
+//   };
 
 //   return (
-//     <div className="w-full space-y-4">
-//       <div>
-//         <h3 className="text-lg font-semibold text-slate-900">Face Login</h3>
-//         <p className="text-sm text-slate-600 mt-1">Position your face in the center for verification</p>
-//       </div>
+//     <div className="space-y-4">
 
-//       <div className="relative bg-slate-900 rounded-lg overflow-hidden aspect-video shadow-lg border-2 border-slate-200">
+//       <div className="relative bg-black rounded-lg overflow-hidden">
 //         <video
 //           ref={videoRef}
 //           autoPlay
 //           playsInline
-//           className="w-full h-full object-cover"
+//           className="w-full"
 //         />
 //         <canvas ref={canvasRef} className="hidden" />
 
 //         {!initialized && (
-//           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-//             <div className="text-center">
-//               <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-3" />
-//               <p className="text-white text-sm font-medium">Loading face detection...</p>
-//             </div>
-//           </div>
-//         )}
-
-//         {initialized && faceDetected && confidence > 0 && (
-//           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm">
-//             <div className="bg-white/95 rounded-lg p-6 shadow-xl max-w-xs">
-//               <div className="flex items-center gap-2 mb-3">
-//                 <BarChart3 className="w-5 h-5 text-blue-600" />
-//                 <span className="font-semibold text-slate-900">Match Confidence</span>
-//               </div>
-//               <Progress value={confidence} className="h-2 mb-2" />
-//               <p className="text-2xl font-bold text-blue-600">{confidence}%</p>
-//               {confidence >= 60 && (
-//                 <p className="text-xs text-green-600 font-medium mt-2">
-//                   ✓ Match confirmed
-//                 </p>
-//               )}
-//             </div>
-//           </div>
-//         )}
-
-//         {initialized && !faceDetected && (
-//           <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-//             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-//             Position your face
-//           </div>
-//         )}
-
-//         {isProcessing && (
-//           <div className="absolute inset-0 flex items-center justify-center bg-green-500/20 backdrop-blur-sm">
-//             <div className="bg-green-50 rounded-lg p-6 shadow-xl">
-//               <Loader2 className="w-8 h-8 text-green-600 animate-spin mx-auto mb-2" />
-//               <p className="text-sm font-medium text-green-900">Verifying...</p>
-//             </div>
+//           <div className="absolute inset-0 flex items-center justify-center">
+//             <Loader2 className="animate-spin text-white" />
 //           </div>
 //         )}
 //       </div>
 
-//       {error && (
-//         <Alert variant="destructive">
-//           <AlertCircle className="h-4 w-4" />
-//           <AlertDescription>{error}</AlertDescription>
-//         </Alert>
-//       )}
+//       <Button
+//         onClick={captureImage}
+//         disabled={isLoading}
+//         className="w-full"
+//       >
+//         {isLoading ? 'Processing...' : 'Capture & Verify'}
+//       </Button>
 
-//       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-//         <p className="text-sm text-blue-900">
-//           <strong>Tip:</strong> Ensure good lighting and keep your face centered for accurate recognition.
-//         </p>
-//       </div>
 //     </div>
 //   );
 // }
 
-
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FaceDetectorProps {
@@ -189,38 +133,57 @@ interface FaceDetectorProps {
 export function FaceDetector({ onCapture, isLoading }: FaceDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const startCamera = async () => {
+  const startCamera = async () => {
+    try {
+      setError(null);
+      setInitialized(false);
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
       });
+
+      streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setInitialized(true);
+        videoRef.current.onloadedmetadata = () => setInitialized(true);
       }
-    };
+    } catch (err) {
+      setError('Camera access denied or not available.');
+      console.error('Camera error:', err);
+    }
+  };
 
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setInitialized(false);
+  };
+
+  useEffect(() => {
     startCamera();
-
-    return () => {
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
-    };
+    return () => stopCamera();
   }, []);
 
-  /* =========================
-     CAPTURE IMAGE
-  ========================= */
   const captureImage = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setError('Camera not ready yet. Please wait.');
+      return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -228,38 +191,90 @@ export function FaceDetector({ onCapture, isLoading }: FaceDetectorProps) {
     const ctx = canvas.getContext('2d');
     ctx?.drawImage(video, 0, 0);
 
-    const base64 = canvas.toDataURL('image/jpeg');
+    const base64 = canvas.toDataURL('image/jpeg', 0.95);
+
+    // stop camera after capture
+    stopCamera();
 
     onCapture(base64);
   };
 
   return (
     <div className="space-y-4">
-
-      <div className="relative bg-black rounded-lg overflow-hidden">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full"
-        />
+      <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
+        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
 
-        {!initialized && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="animate-spin text-white" />
+        {/* overlay while initializing */}
+        {!initialized && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto">
+                <Camera className="w-6 h-6 text-cyan-400 animate-pulse" />
+              </div>
+              <p className="text-white text-sm font-medium">Starting camera...</p>
+            </div>
+          </div>
+        )}
+
+        {/* face guide overlay */}
+        {initialized && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-56 border-2 border-cyan-400/60 rounded-full" />
+          </div>
+        )}
+
+        {/* loading overlay while API processes */}
+        {/* {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto" />
+              <p className="text-white text-sm font-medium">Verifying face...</p>
+            </div>
+          </div>
+        )} */}
+        {/* loading overlay while API processes */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 rounded-xl">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto" />
+              <p className="text-white text-sm font-medium tracking-wide">Verifying face...</p>
+            </div>
           </div>
         )}
       </div>
 
-      <Button
-        onClick={captureImage}
-        disabled={isLoading}
-        className="w-full"
-      >
-        {isLoading ? 'Processing...' : 'Capture & Verify'}
-      </Button>
+      {error && (
+        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+          {error}
+        </div>
+      )}
 
+      <div className="flex gap-3">
+        <Button
+          onClick={captureImage}
+          disabled={!initialized || isLoading}
+          className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white font-semibold rounded-xl py-2.5"
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+            </span>
+          ) : (
+            'Capture & Verify'
+          )}
+        </Button>
+
+        {error && (
+          <Button
+            onClick={startCamera}
+            variant="outline"
+            className="px-4 border-white/20 text-slate-300 hover:bg-white/10 rounded-xl"
+          >
+            Retry
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

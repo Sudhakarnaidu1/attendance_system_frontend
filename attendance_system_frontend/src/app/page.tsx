@@ -325,5 +325,8 @@
 import AttendancePage from './attendance/page';
 
 export default function Home() {
-  return <AttendancePage />;
+  return(
+  <div>
+    <AttendancePage />
+  </div>);
 }

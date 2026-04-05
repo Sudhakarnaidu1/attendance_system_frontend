@@ -73,7 +73,11 @@ export default function LoginPage() {
         description: 'Logged in successfully.',
         // variant: "destructive",
       });
-      router.push('/dashboard');
+      if (data.user.user_type === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       // toast.error('Login failed. Please try again.');
       toast({

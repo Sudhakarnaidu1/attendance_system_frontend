@@ -283,12 +283,13 @@ export default function RegisterPage() {
     employeeId: '',
     email: '',
     password: '',
-    department: '',
+    department: 'BCA' as 'BBA' | 'BCA' | 'B.Com',
     userType: 'user' as 'admin' | 'user',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    console.log(name, value)
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -304,47 +305,95 @@ export default function RegisterPage() {
   };
 
   const handleNextStep = () => {
+    console.log('form data', formData)
     if (!validateForm()) return;
     setStep('face');
   };
 
+  // const handleFaceCapture = async (imageBase64: string) => {
+  //   setIsLoading(true);
+
+  //   try {
+  //     const res = await fetch('http://127.0.0.1:8000/api/register-face/', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         name: formData.name,
+  //         employee_id: formData.employeeId,
+  //         email: formData.email,
+  //         password: formData.password,
+  //         department: formData.department,
+  //         user_type: formData.userType,
+  //         image: imageBase64,
+  //       }),
+  //     });
+
+  //     const data = await res.json();
+  //     console.log("API response:", data);
+  //     toast({description: 'Received response from server', title: 'Success'});
+
+  //     if (!data.success) {
+  //       toast({description: data.message || 'Failed to register', title:'Error', variant: 'destructive'});
+  //       setIsLoading(false);
+  //       return;
+  //     }
+
+  //     setRegisteredUser(data.user);
+  //     setStep('success');
+  //     toast({description: 'Registration successful!', title:'Success'});
+  //   } catch (err) {
+  //     toast({description:'Failed to save data', title:'Error', variant:'destructive'});
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleFaceCapture = async (imageBase64: string) => {
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/register-face/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          employee_id: formData.employeeId,
-          email: formData.email,
-          password: formData.password,
-          department: formData.department,
-          user_type: formData.userType,
-          image: imageBase64,
-        }),
+  try {
+    const res = await fetch('http://127.0.0.1:8000/api/register-face/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: formData.name,
+        employee_id: formData.employeeId,
+        email: formData.email,
+        password: formData.password,
+        department: formData.department,
+        user_type: formData.userType,
+        image: imageBase64,
+      }),
+    });
+
+    const data = await res.json();
+
+    // ✅ Check success flag first — no premature success toast
+    if (!data.success) {
+      toast({
+        title: 'Registration Failed',
+        description: data.message || 'Something went wrong.',
+        variant: 'destructive',
       });
-
-      const data = await res.json();
-      console.log("API response:", data);
-      toast({description: 'Received response from server', title: 'Success'});
-
-      if (!data.success) {
-        toast({description: data.message || 'Failed to register', title:'Error', variant: 'destructive'});
-        setIsLoading(false);
-        return;
-      }
-
-      setRegisteredUser(data.user);
-      setStep('success');
-      toast({description: 'Registration successful!', title:'Success'});
-    } catch (err) {
-      toast({description:'Failed to save data', title:'Error', variant:'destructive'});
-    } finally {
-      setIsLoading(false);
+      return; // stay on face step so user can retry
     }
-  };
+
+    // ✅ Only toast success when it actually succeeded
+    setRegisteredUser(data.user);
+    setStep('success');
+    toast({ title: 'Success', description: 'Registration successful!' });
+
+  } catch (err) {
+    // ✅ Network/parse error — distinguish from API error
+    toast({
+      title: 'Network Error',
+      description: 'Could not reach the server. Check your connection.',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-white font-sans flex flex-col">
@@ -416,7 +465,7 @@ export default function RegisterPage() {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="John Doe"
+                      placeholder="Enter full name"
                       className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition-all text-sm"
                     />
                   </div>
@@ -428,7 +477,7 @@ export default function RegisterPage() {
                       name="employeeId"
                       value={formData.employeeId}
                       onChange={handleChange}
-                      placeholder="EMP001"
+                      placeholder="Enter your student id"
                       className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition-all text-sm"
                     />
                   </div>
@@ -443,7 +492,7 @@ export default function RegisterPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="john@company.com"
+                    placeholder="Enter your email address"
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition-all text-sm"
                   />
                 </div>
@@ -467,13 +516,23 @@ export default function RegisterPage() {
                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                       Department
                     </label>
-                    <input
+                    {/* <input
                       name="department"
                       value={formData.department}
                       onChange={handleChange}
                       placeholder="Engineering"
                       className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition-all text-sm"
-                    />
+                    /> */}
+                    <select 
+                    name="department"
+                    value={formData.department}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#0a0f1e] border border-white/15 text-white focus:outline-none focus:border-cyan-500 transition-all text-sm"
+                    >
+                      <option value="BCA">BCA</option>
+                      <option value="BBA">BBA</option>
+                      <option value="B.Com">B.Com</option>
+                    </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
